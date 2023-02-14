@@ -1,0 +1,146 @@
+---
+title: "mars"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{mars}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+```{r setup}
+library(mars)
+```
+
+
+## What is the motivation behind MARS?
+As accessing data is getting easier and easier, there are more and more explanatory variables available in data sets just to predict one response variable. In many disciplines, it is a very common problem to model the dependence of a response variable y on several to many explanatory variables x~1~,..., x~n~, given only the values of the response variable at various points in dependent variable space. In the field of Statistics, we assume that the system that generated the data is described by:  
+                         y = f(x~1~,...,x~n~) + e,   
+where the true function f captures the joint predictive relationship of y on x~1~,..., x~n~, and e is the error term. In these multivariate data settings, our aim is to approximate this true function f. To approximate this true function f, one can use parametric modelling or non-parametric modelling. Parametric modelling is likely to produce accurate approximations only when the form of the true underlying function is close to the prescribed parametric one. In small number of variables, one can observe from the plot and estimate the form of the underlying true function, but in higher dimensions, it is very difficult to estimate the form of this true function. This is why we need non-parametric modelling techniques like Multivariate Adaptive Regression Splines (MARS), because __it can discover non-linearity in high dimensional data automatically__.
+
+
+## What is MARS and how this algorithm works?
+The main idea behind MARS algorithm is to create a piece-wise linear model, so that the relationship between the predictor and the response can be different for different sub-regions of predictor variable space.  
+
+### Main Mars Algorithm
+The whole algorithm can be divided into two sub-algorithms, forward step-wise and backward step-wise algorithm.Forward step-wise algorithm is based on recursive partitioning, with the aim of optimally splitting the predictor variable space into the maximum number of sub-regions specified by user. This algorithm is implemented using four loops. The outermost loop iterates over 1 to half of the maximum number of subregions allowed by user. Here we are looping up to half, because each iteration of this outer loop will add pairs of basis functions, where each basis function represents a sub-region. Within this first loop, based on what iteration number of first loop is going on, second for loop tries to find the optimum basis function to split on. The second for loop iterates from 1 to twice the iteration number of first loop minus 1, since that is the maximum number of basis function in the current model based on iteration number of first loop. The third loop selects the variable to split on within this basis function, and it has to be a variable which has not already been used in this basis function. Lastly, the fourth loop selects the split point (knot) on the variable. The variable and the split point is selected by fitting a model at every iteration and computing a measure of lack of fit using GCV criterion (discussed below in detail). An optimum variable and split point is the one with the smallest value for GCV criterion. To record all these basis functions, there is a list called Bfuncs and matrix called B as part of an object of class "mars". These are updated as the model selects the optimum splits. At each iteration of the first loop, the algorithm adds two basis function in pairs that are identical except that a different side of a mirrored hinge is used for each basis function. A hinge function (discussed below in detail) is defined by a sign (+/-), variable, and a split-point. In this way, MARS is searching over all combinations of existing basis functions, variables in them, and values of each variable. Due to this, forward step-wise algorithm is "greedy" and therefore must be followed by backward step-wise algorithm. Backward step-wise algorithm removes terms one by one, selecting the least effective term at each step until it finds the best sub-model. Model subsets are compared using the Generalized Cross Validation (GCV) criterion. This is implemented using two for loops. First loop iterates over all the possible model sizes starting from Mmax + 1. At each iteration of this outer loop we set variable keeping track of the lack of fit measure (GCV) to infinity. The inner loop iterates over all the model terms in the current model under outer loop, and try removing one basis function at a time, fitting the model and calculating lack of fit value using GCV criterion. If lack of fit value observed is lowest in this iteration of the inner loop, it updates the the current model, and if this LOF value is also the lowest in all iterations so far of the outer loop, it updates the  final model that will be returned as an output.
+
+### Hinge functions
+Hinge functions are key part of MARS models. For a variable x and split-point (knot) "a" at that variable, hinge functions takes the form max(0, x - a) or max(0, a - x). Hinge function is 0 for part of its range, so can be used to partition the data into disjoint regions, each of which can be treated independently. Hinge functions can be multiplied together to form non-linear functions. 
+
+### Generalized Cross Validation (GCV) Criterion
+While selecting models in MARS algorithm, GCV criterion is used as a measure of "lack of fit" (LOF). One very common measure for LOF is Residual Sum of Squares (RSS). The problem with RSS is that it decreases as we add predictors, therefore always favors larger models. For model selection, an unbiased measure of the "test error" is needed. A better approach over RSS is Cross-Validation, which splits the data into "folds", fits the model on all but a hold-out, and averages the validation errors across folds. But it is very time consuming, therefore we use Generalized Cross-Validation, which is an approximation of Cross-Validation. The formula for GCV criterion is as follows:  
+                      RSS×(N/(N - C'(M))^2^)  
+Here,   
+N: number of the rows in the data set.  
+M: one less than number of coefficients in the fitted model.  
+C'(M): C(M) + d*M, where,   
+  C(M): sum of the hat-values from the fitted model  
+  d: smoothing parameter. Friedman suggests that d = 3 works well.  
+
+## How to call mars() function?  
+Calling mars function requires three arguments:  
+formula: an object of class "formula". Through this argument, one can describe what is response and what are explanatory variables.  
+data: this is a data frame that includes all the explanatory variables and response variables.  
+control: this is an object of class "mars.control". It is a list of three elements (discussed in detail below).
+
+### Preparing the inputs (arguments)
+To show how to prepare the inputs and other features of mars, an example using "housing_prices" data set is presented, where the goal is to model selling prices of houses in Amis, Iowa. This data set is a part of mars package. Please look at help file for this data set for more details.  
+
+#### formula
+To write value for the formula argument, one need to identify response variable and explanatory variables from the data set. Once it is decided it can be written in the form:   response ~ explanatory_variable_1 + explanatory_variable_2 + ... + explanatory_variable_n  
+If all other variables except response variable are explanatory variables in the data set, "response_variable ~ ." form can be used.  
+In the running example using housing_prices data set, value for formula argument will be "SalePrice ~ ."
+
+
+#### data
+To get value for the data argument, one needs to import data set into current R session using appropriate function and store it in an object, or create the data set using "data.frame" function. That object will be the value for the data argument. Object in the data argument should be an object of class "data.frame".  
+In the running example, data set is "housing_prices", which is a part of mars package. Please see helpfile for more detail using "?housing_prices".
+```{r}
+data = housing_prices
+```
+
+#### control
+As described above control is an object of class "mars.control", and is a list containing three elements. These three elements are:  
+Mmax: An integer indicating maximum number of basis function user wants to allow, default value is 2. It must be an even number since basis functions are added in pairs, as discussed above.  
+d: smoothing parameter used in GCV criterion. Default value is 3, as recommended by Friedman in his MARS paper.  
+trace: an object of type "logical". If user wants to see what is happening as the mars function is proceeding, set it to TRUE. Default value is FALSE.  
+An object of class "mars.control" is created using "mars.control" function. One should use "mars.control" function to create this list of three elements, rather than creating a list separately, because "mars.control" function validates all the inputs for the user. It ensures that **Mmax is an even integer**, **trace is logical**, and **d is a number**. If trace is not logical, or d is not numeric, the execution halts. If Mmax is not even, it adds one to make it even. If Mmax is not integer, it tries to coerce it to integer, therefore Mmax of value 4.99 will become 4, and Mmax of value 3 will become 4. 
+Given below are some examples of creating an object of class "mars.control":
+```{r}
+
+mc <- mars.control(Mmax = 10, d = 3, trace = FALSE)
+mc
+
+```
+Some examples showing how you get errors if you put wrong inputs and how mars.control function helps you ensure right input.
+```{r}
+mc1 <- mars.control(Mmax = 4.99)
+mc2 <- mars.control(Mmax = 3)
+
+```
+In the ongoing example, "mc" object created above will be used.  
+
+### Calling mars function
+Now all the inputs for mars function are ready, its time to call the "mars" function.
+```{r}
+house.mars <- mars(formula = SalePrice ~ ., data = housing_prices, control = mc)
+```
+To view what is inside this object created by "mars" function, there are some methods that will be discussed later, but for now, call made to mars function and more importantly, coefficients of the fitted model can be viewed.  
+```{r}
+house.mars
+```
+The output of the mars function includes much more than these two components. It is a list of 18 elements. Many elements are same as an object of class "lm" because output of mars function is an object of class "mars" and "lm". See below:
+```{r}
+str(house.mars)
+```
+To summarize, the main components that one should know about are:  
+Call: call made to the mars function  
+Formula: formula argument  
+Y: a vector of response variable  
+B: a matrix B showing value for each basis function for each row of the training data set.  
+Bfuncs:  a list Bfuncs containing resulting basis functions, each element is a data frame for one basis function, showing its component hinge functions  
+x_names: containing name of explanatory variables  
+Rest of the output elements are similar to an object of class "lm".  
+
+## Some useful methods for an object of class "mars"
+To increase the usefulness of mars function, mars function comes with its own methods. These are generic R functions and the way the output is conveyed is very similar to class "lm", so it should not be hard to learn these.  
+
+### summary.mars method
+This method is somewhat similar to summary method for objects of class "lm". But, the resulting components are little different based on what is important in case of MARS fitted models. It presents the call made by user to mars function, coefficients of the fitted model, basis functions and component of each and every basis function presented in the final model. It is called as summary(object).    
+Continuing the example, summary.mars method is applied on house.mars object below:
+```{r}
+summary(house.mars)
+```
+Notice, how it shows each and every basis function in the final model and all the component hinge functions that make up that basis function. Remember, each basis function is a product of such hinge function. One basis function can be a single hinge function itself, or product of two or more hinge functions. In the example above B10 is a basis function that has only one hinge function, and B8 has two component hinge functions.  
+
+### print.mars method
+This method is very similar to print method of class "lm". It prints the call made by user to the mars function, and coefficients of the fitted model. It is called as print(object).   
+Continuing example below:  
+```{r}
+print(house.mars)
+```
+### predict.mars method
+This method is really important since ability to make more and more accurate predictions is the reason of collecting more and more data on several to many variables. predict.mars produces predicted values with either a new data set or the training data set used to develop the model.  
+It is called as:  
+predict(object, newdata).   
+It takes in as argument an object of class "mars", and use the fit from this object to produce predictions on the test data provided in the newdata argument. If newdata is NULL, prediction will be done on the training data (the one used to create object argument). There will be no need to create a new B matrix for basis functions as B matrix from object argument will be used. If the newdata argument is not NULL, then prediction will be done on the new dataset, and new B matrix will be constructed for this particular data set using Bfuncs list from fitted model.  
+Continuing example from housing_prices data set. Let's try to predict Saleprice of houses from the training data set, i.e. newdata argument will be NULL. 
+```{r}
+predict(object = house.mars)
+```
+It returns an a vector of predicted values for response variable. Length of vector depends on the number of rows in the training dataset in this case. If we add a test data set in the newdata argument, then the length of vector of predicted values will be equal to number of rows in the test data set.  
+Example below using predict function on house.mars object using test data set housing_prices_test. This data set is a part of mars package. For more information, see the help file using "?housing_prices_test".
+```{r}
+predict(object = house.mars, newdata = housing_prices_test)
+```
+This is the vector showing predicted values using the test data set housing_prices_test. Read documentation of data set "housing_prices" and "housing_prices_test" for more information.  
+
+### plot.mars method
+plot.mars method is also similar to plot function for an object of class "lm". plot.mars method produces plots for the input mars object. It is limited to three dimensional plots, therefore it only produces plots for basis functions with one or two variables in them. NO PLOT IS PRODUCED FOR BASIS FUNCTIONS WITH MORE THAN TWO HINGE FUNCTIONS AS THEIR COMPONENTS. To see which basis functions and its components, use summary.mars method as described above. This method identifies the basis functions with 1 or 2 components from Bfuncs list of mars object. Index for one and two components basis function is stored separately in two different vectors. Then it splits the plot into a matrix of plots based on total number of one and two components basis functions. "plot" function is then used to plot all the basis functions with one variable in it, and "persp" function is used to plot basis functions with two variable components in it. Graphical parameters are reset at the end using an exit handler.  
+It is called as plot(x).  
+Given below is an example where plot.mars function is applied to house.mars object.  
+```{r fig.height=7.5, fig.width=7.5}
+plot(house.mars)
+```
+Notice that there are 8 plots for 8 basis functions (B1, B2, B3, B4, B5, B6, B9, B10) that are single hinge function basis functions, and 2 plots for two basis functions (B7, B8) that contain two hinge functions each. From this plot we can easily understand each basis function. For example: basis function B1 and B2 are mirror images of each other, they are made of same variable, i.e. overall quality of the materials used in the house. B1 decreases linearly up to an overall quality rating of 7 and is 0 afterwards, and B2 is 0 upto overall quality rating of 7 and increases linearly afterwards. Similarly, B5 and B6 are mirror images of each other, depends on the total square feet of the basement. Basis functions B7 and B8 depends on two variables above ground living area in square feet and Total Basement Surface Area, hence they have three dimensional plots. It is evident that B7 decreases as both the variables increases. For lower to moderately high values of ground living area, as total basement area increases B7 decreases and approaches 0. 

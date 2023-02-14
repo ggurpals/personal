@@ -1,0 +1,23 @@
+Package: mars
+Title: Multivariate Adaptive Regression Splines
+Version: 0.0.0.9000
+Authors@R: 
+    person("Samir", "Arora", , "samira@sfu.ca", role = c("aut", "cre"))
+    person("Gurpal", "Tulli", , "ggurpals@sfu.ca", role = c("aut", "cre"))
+Description: This package is an implementation of MARS method presented by Dr. Jerome H. Friedman in 1991 in his paper with the same name. This method is used for flexible regression modelling of high dimensional data. The resulting model is a product of spline basis functions, where the number of basis functions as well as the parameters associated  with each one (product degree and knot locations) are automatically determined by the data.
+License: GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.2
+Imports: 
+    graphics,
+    stats
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Depends: 
+    R (>= 2.10)
+LazyData: true
+VignetteBuilder: knitr
